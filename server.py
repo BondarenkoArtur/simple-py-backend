@@ -7,8 +7,13 @@ Usage::
 import json
 import logging
 import time
+from binascii import unhexlify
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+import os
+
+fmt24 = '%06x'
+fmt32 = '%08x'
 
 class S(BaseHTTPRequestHandler):
     def _set_response(self):
@@ -24,10 +29,21 @@ class S(BaseHTTPRequestHandler):
         logging.info("GET request,\nPath: %s\nHeaders:\n%s\n", str(self.path), str(self.headers))
         self._set_response()
         if str(self.path).startswith('/data/'):
-            self.wfile.write("[".format(self.path).encode('utf-8'))
-            f = open("data.txt", "rb")
-            self.wfile.write(f.read())
-            self.wfile.write("]".format(self.path).encode('utf-8'))
+            f = open("data.bin", "rb")
+            data = f.read()
+            f.close()
+            json_string = "["
+            for d in range(0, len(data), 11):
+                json_string += "["
+                json_string += str(1000 * int.from_bytes(data[d + 0:d + 4], byteorder='big'))
+                json_string += ","
+                json_string += str(int.from_bytes(data[d + 4:d + 8], byteorder='big'))
+                json_string += ","
+                json_string += str(int.from_bytes(data[d + 8:d + 11], byteorder='big'))
+                json_string += "]"
+                json_string += ","
+            json_string = json_string[:-1] + "]"
+            self.wfile.write(json_string.encode("utf-8"))
         else:
             f = open("index.html", "rb")
             self.wfile.write(f.read())
@@ -44,11 +60,30 @@ class S(BaseHTTPRequestHandler):
         rank = data.get('rank')
         if rank == "undefined":
             rank = 0
-        # todo fix first value should be without comma
-        array = ",[" + str(int(time.time() * 1000)) + "," + data.get('balance') + "," + rank + "]\n"
-        f = open("data.txt", "a+")
-        f.write(array)
-        f.close()
+        binary_data = unhexlify(fmt32 % int(time.time()))
+        binary_data += unhexlify(fmt32 % int(data.get('balance')))
+        binary_data += unhexlify(fmt24 % int(rank))
+        if not os.path.exists("data.bin"):
+            out_file = open("data.bin", "w+b")
+            out_file.write(binary_data)
+            out_file.close()
+        else:
+            if os.path.getsize("data.bin") < 22:
+                out_file = open("data.bin", "a+b")
+                out_file.write(binary_data)
+                out_file.close()
+            else:
+                out_file = open("data.bin", "r+b")
+                out_file.seek(-22, 2)
+                file_data = out_file.read()
+                if file_data[4:8] == file_data[15:19] and file_data[8:11] == file_data[19:22] and \
+                                binary_data[4:8] == file_data[15:19] and binary_data[8:11] == file_data[19:22]:
+                    out_file.seek(-11, 2)
+                    out_file.write(binary_data)
+                    out_file.truncate()
+                else:
+                    out_file.write(binary_data)
+                    out_file.close()
         self.wfile.write("POST request for {}".format(self.path).encode('utf-8'))
 
     def do_OPTIONS(self):
