@@ -59,7 +59,8 @@ class S(BaseHTTPRequestHandler):
         data = json.loads(post_data.decode('utf-8'))
         rank = data.get('rank')
         if rank == "undefined":
-            rank = 0
+            self.wfile.write("Why rank undefined?".format(self.path).encode('utf-8'))
+            return
         binary_data = unhexlify(fmt32 % int(time.time()))
         binary_data += unhexlify(fmt32 % int(data.get('balance')))
         binary_data += unhexlify(fmt24 % int(rank))
