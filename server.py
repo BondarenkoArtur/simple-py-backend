@@ -24,8 +24,6 @@ class S(BaseHTTPRequestHandler):
         logging.info("GET request,\nPath: %s\nHeaders:\n%s\n", str(self.path), str(self.headers))
         self._set_response()
         if str(self.path).startswith('/data/'):
-            # data = "[[" + str(int(time.time() * 1000)) + "," + str(random.randrange(10)) + "," + str(
-                # random.randrange(100)) + "]]"
             self.wfile.write("[".format(self.path).encode('utf-8'))
             f = open("data.txt", "rb")
             self.wfile.write(f.read())
